@@ -15,11 +15,11 @@ def assignuniqueid():
         msgidpool += 1
     return tempid
 
-def create_message(msgtype, src, msgfields={}):
+def create_message(msgtype, src, msgfields=None):
     global msgidpool
     global msgidpool_lock
 
-    m = msgfields
+    m = {} if msgfields is None else msgfields.copy()
     m[FLD_ID] = assignuniqueid()
     m[FLD_TYPE] = msgtype
     m[FLD_SRC] = src
@@ -68,7 +68,7 @@ def parse_prepare(msg):
 def parse_prepare_reply(msg):
     src = Peer(msg[FLD_SRC][0], msg[FLD_SRC][1], msg[FLD_SRC][2])
     pvalueset = PValueSet()
-    for index,pvalue in msg[FLD_PVALUESET].iteritems():
+    for index,pvalue in msg[FLD_PVALUESET].items():
         pvalueset.pvalues[Proposal(index[1][0],
                                    index[1][1],
                                    index[1][2])] = PValue(pvalue[0], pvalue[1], pvalue[2])
@@ -129,7 +129,7 @@ def parse_incclientrequest(msg):
 
 def parse_updatereply(msg):
     src = Peer(msg[FLD_SRC][0], msg[FLD_SRC][1], msg[FLD_SRC][2])
-    for commandnumber,command in msg[FLD_DECISIONS].iteritems():
+    for commandnumber,command in msg[FLD_DECISIONS].items():
         try:
             msg[FLD_DECISIONS][commandnumber] = Proposal(msg[FLD_DECISIONS][commandnumber][0],
                                                          msg[FLD_DECISIONS][commandnumber][1],

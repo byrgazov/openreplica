@@ -47,24 +47,24 @@ def which(program):
 @timeout(30)
 def connect_to_leader():
     c_leader = Counter('127.0.0.1:14000')
-    print "Connecting to old leader"
+    print("Connecting to old leader")
     for i in range(100):
         c_leader.increment()
     # This method will timeout before it reaches here.
-    print "Client Made Progress: Counter value: %d" % c_minority.getvalue()
+    print("Client Made Progress: Counter value: %d" % c_minority.getvalue())
     return True
 
 def test_timeout():
     numreplicas = 3
     processes = []
 
-    print "Running replica 0"
+    print("Running replica 0")
     processes.append(subprocess.Popen(['concoord', 'replica',
                                       '-o', 'concoord.object.counter.Counter',
                                       '-a', '127.0.0.1', '-p', '14000']))
 
     for i in range(1, numreplicas):
-        print "Running replica %d" %i
+        print("Running replica %d" % i)
         processes.append(subprocess.Popen(['concoord', 'replica',
                                            '-o', 'concoord.object.counter.Counter',
                                            '-a', '127.0.0.1', '-p', '1400%d'%i,
@@ -77,10 +77,10 @@ def test_timeout():
     c_P1 = Counter('127.0.0.1:14000', debug = True)
     c_P2 = Counter('127.0.0.1:14001, 127.0.0.1:14002')
     # The client should work
-    print "Sending requests to the leader"
+    print("Sending requests to the leader")
     for i in range(100):
         c_P1.increment()
-    print "Counter value after 100 increments: %d" % c_P1.getvalue()
+    print("Counter value after 100 increments: %d" % c_P1.getvalue())
 
     # Save iptables settings for later recovery
     with open('test.iptables.rules', 'w') as output:
@@ -93,21 +93,21 @@ def test_timeout():
                                           '--dport', '14000',
                                           '-j', 'DROP'])
 
-    print "Cutting the connections to the leader. Waiting for system to stabilize."
+    print("Cutting the connections to the leader. Waiting for system to stabilize.")
     time.sleep(10)
 
-    print "Connecting to old leader, which should not make progress."
+    print("Connecting to old leader, which should not make progress.")
     if connect_to_leader():
-        print "===== TEST FAILED ====="
+        print("===== TEST FAILED =====")
     else:
         # c_P2 should make progress
-        print "Connecting to other nodes, which should have a new leader."
+        print("Connecting to other nodes, which should have a new leader.")
         for i in range(100):
             c_P2.increment()
-        print "Counter value after 100 increments: %d" % c_P2.getvalue()
-        print "===== TEST PASSED ====="
+        print("Counter value after 100 increments: %d" % c_P2.getvalue())
+        print("===== TEST PASSED =====")
 
-    print "Fixing the connections and cleaning up."
+    print("Fixing the connections and cleaning up.")
     with open('test.iptables.rules', 'r') as input:
         subprocess.Popen(['sudo', 'iptables-restore'], stdin=input)
     subprocess.Popen(['sudo', 'rm', 'test.iptables.rules'])

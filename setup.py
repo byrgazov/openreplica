@@ -14,7 +14,7 @@ classifiers = [
     'Operating System :: POSIX :: Linux',
     'Operating System :: Unix',
     'Programming Language :: Python',
-    'Programming Language :: Python :: 2.7',
+    'Programming Language :: Python :: 3.7',
 ]
 
 setup(
@@ -33,8 +33,7 @@ setup(
                             'openreplica = concoord.openreplica.main:main']
     },
     install_requires=[
-        'python>=2.7',
-        'msgpack-python',
+        'msgpack',
         'dnspython',
     ],
 )

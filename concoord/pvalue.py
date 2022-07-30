@@ -6,7 +6,7 @@
 from concoord.pack import *
 import types
 
-class PValueSet():
+class PValueSet:
     """PValueSet encloses a set of pvalues with the highest ballotnumber (always)
     and supports corresponding set functions.
     """
@@ -23,7 +23,7 @@ class PValueSet():
         else:
             index = (pvalue.commandnumber,pvalue.proposal)
 
-        if self.pvalues.has_key(index):
+        if index in self.pvalues:
             if self.pvalues[index].ballotnumber < pvalue.ballotnumber:
                 self.pvalues[index] = pvalue
         else:
@@ -64,7 +64,7 @@ class PValueSet():
         PValueSet overwriting the (commandnumber,proposal) pairs with lower
         ballotnumber
         """
-        for candidate in otherpvalueset.pvalues.itervalues():
+        for candidate in otherpvalueset.pvalues.values():
             self.add(candidate)
 
     def pmax(self):
@@ -80,4 +80,4 @@ class PValueSet():
 
     def __str__(self):
         """Returns PValueSet information"""
-        return "\n".join(str(pvalue) for pvalue in self.pvalues.itervalues())
+        return "\n".join(str(pvalue) for pvalue in self.pvalues.values())

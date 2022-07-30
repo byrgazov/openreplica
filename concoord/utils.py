@@ -15,11 +15,11 @@ def findOwnIP():
     return socket.gethostbyname(socket.gethostname())
 
 def get_addressportpairs(group):
-    for peer in group.iterkeys():
+    for peer in group.keys():
         yield (peer.addr,peer.port)
 
 def get_addresses(group):
-    for peer in group.iterkeys():
+    for peer in group.keys():
         yield peer.addr
 
 # A logger will always print to the screen. It can also log to a file or to a network log daemon.
@@ -48,9 +48,9 @@ class Logger():
                 return
 
     def write(self, cls, string):
-        print "[%s] %s %s: %s" % (self.prefix + '_' + threading.current_thread().name,
+        print("[%s] %s %s: %s" % (self.prefix + '_' + threading.current_thread().name,
                                   time.time(), # time.asctime(time.localtime(time.time())),
-                                  cls, string)
+                                  cls, string))
         if self.log is not None:
             self.log.write("[%s] %s %s: %s" % (self.prefix + '_' + threading.current_thread().name,
                                                time.time(), # time.asctime(time.localtime(time.time())),
@@ -76,7 +76,7 @@ def endtimer(timerkey, timerno):
         if timers[index][1] == 0:
             timers[index][1] = time.time()
     except:
-        print "Can't stop timer %s %s." % (str(timerkey),str(timerno))
+        print("Can't stop timer %s %s." % (str(timerkey),str(timerno)))
 
 def dumptimers(numreplicas, ownertype, outputdict):
     global timers
@@ -85,7 +85,7 @@ def dumptimers(numreplicas, ownertype, outputdict):
         outputfile = open(outputdict+filename, "w")
     except:
         outputfile = open("./"+filename, "w")
-    for index,numbers in timers.iteritems():
+    for index,numbers in timers.items():
         timerkey, timerno = index.rsplit("-")
         if not numbers[1]-numbers[0] < 0:
             outputfile.write("%s:\t%s\t%s\n"  % (str(timerno),
@@ -135,9 +135,9 @@ def endtiming(fn):
             sys.stdout.flush()
             profile_off()
             profilerdict = get_profile_stats()
-            for key, value in sorted(profilerdict.iteritems(),
-                                     key=lambda (k,v): (v[2],k)):
-                print "%s: %s" % (key, value)
+            for key, value in sorted(profilerdict.items(),
+                                     key=lambda k_v: (k_v[1][2],k_v[0])):
+                print("%s: %s" % (key, value))
             time.sleep(10)
             sys.stdout.flush()
             os._exit(0)
@@ -157,10 +157,10 @@ def throughput_test(fn):
         elif obj.throughput_runs == 1100:
             obj.throughput_stop = time.time()
             totaltime = obj.throughput_stop - obj.throughput_start
-            print "********************************************"
-            print "TOTAL: ", totaltime
-            print "TPUT: ", 1000/totaltime, "req/s"
-            print "********************************************"
+            print("********************************************")
+            print("TOTAL: ", totaltime)
+            print("TPUT: ", 1000/totaltime, "req/s")
+            print("********************************************")
             obj._graceexit(1)
         return ret
     return new

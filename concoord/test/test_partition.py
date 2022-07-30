@@ -7,7 +7,7 @@
 import sys, os
 import signal, time
 import socket, struct
-import cPickle as pickle
+import pickle
 import subprocess
 from concoord.message import *
 from concoord.proxy.counter import Counter
@@ -42,7 +42,7 @@ def get_replica_status(replica):
         s.close()
         return pickle.loads(msg)
     except:
-        print "Cannot connect to Replica  %s:%d" % (addr, int(port))
+        print("Cannot connect to Replica  %s:%d" % (addr, int(port)))
         return None
 
 def timeout(timeout):
@@ -86,7 +86,7 @@ def connect_to_minority():
     for i in range(50):
         c_minority.increment()
     # This method will timeout before it reaches here.
-    print "Counter value: %d" % c_minority.getvalue()
+    print("Counter value: %d" % c_minority.getvalue())
     return True
 
 def test_partition():
@@ -95,7 +95,7 @@ def test_partition():
     p2_pids = []
 
     # P1 Nodes
-    print "Running replica 0"
+    print("Running replica 0")
     p = subprocess.Popen(['concoord', 'replica',
                           '-o', 'concoord.object.counter.Counter',
                           '-a', '127.0.0.1', '-p', '14000'])
@@ -103,7 +103,7 @@ def test_partition():
     p1_pids.append(p.pid)
 
     # P2 Nodes
-    print "Running replica 1"
+    print("Running replica 1")
     p = subprocess.Popen(['concoord', 'replica',
                           '-o', 'concoord.object.counter.Counter',
                           '-a', '127.0.0.1', '-p', '14001',
@@ -111,7 +111,7 @@ def test_partition():
     processes.append(p)
     p2_pids.append(p.pid)
 
-    print "Running replica 2"
+    print("Running replica 2")
     p = subprocess.Popen(['concoord', 'replica',
                           '-o', 'concoord.object.counter.Counter',
                           '-a', '127.0.0.1', '-p', '14002',
@@ -126,10 +126,10 @@ def test_partition():
     c_P1 = Counter('127.0.0.1:14000')
     c_P2 = Counter('127.0.0.1:14001,127.0.0.1:14002')
     # The client should work
-    print "Sending requests to the leader"
+    print("Sending requests to the leader")
     for i in range(50):
         c_P1.increment()
-    print "Counter value after 50 increments: %d" % c_P1.getvalue()
+    print("Counter value after 50 increments: %d" % c_P1.getvalue())
 
     # Save iptables settings for later recovery
     with open('test.iptables.rules', 'w') as output:
@@ -167,24 +167,24 @@ def test_partition():
                                               '--sport', '14000',
                                               '-j', 'DROP']))
 
-    print "Created the partition. Waiting for system to stabilize."
+    print("Created the partition. Waiting for system to stabilize.")
     time.sleep(20)
 
     # c_P2 should make progress
-    print "Connecting to the majority, which should have a new leader."
+    print("Connecting to the majority, which should have a new leader.")
     for i in range(50):
         c_P2.increment()
-    print "Counter value after 50 more increments: %d" % c_P2.getvalue()
+    print("Counter value after 50 more increments: %d" % c_P2.getvalue())
     if c_P2.getvalue() == 100:
-        print "SUCCESS: Majority made progress."
+        print("SUCCESS: Majority made progress.")
 
-    print "Connecting to the minority, which should not make progress."
+    print("Connecting to the minority, which should not make progress.")
     if connect_to_minority():
-        print "===== TEST FAILED ====="
+        print("===== TEST FAILED =====")
         sys.exit('Minority made progress.')
-    print "SUCCESS: Minority did not make progress."
+    print("SUCCESS: Minority did not make progress.")
 
-    print "Ending partition."
+    print("Ending partition.")
     # End partition
     with open('test.iptables.rules', 'r') as input:
         subprocess.Popen(['sudo', 'iptables-restore'], stdin=input)
@@ -192,21 +192,21 @@ def test_partition():
 
     time.sleep(40)
     # c_P1 should make progress
-    print "Connecting to the old leader."
+    print("Connecting to the old leader.")
     if not connect_to_minority():
-        print "===== TEST FAILED ====="
-        print "Old leader could not recover after partition."
-        print get_replica_status('127.0.0.1:14000')
+        print("===== TEST FAILED =====")
+        print("Old leader could not recover after partition.")
+        print(get_replica_status('127.0.0.1:14000'))
         for p in (processes):
             p.kill()
         return True
     if c_P1.getvalue() == 150:
-        print "SUCCESS: Old leader recovered."
-        print "===== TEST PASSED ====="
+        print("SUCCESS: Old leader recovered.")
+        print("===== TEST PASSED =====")
     else:
-        print "FAILURE: Old leader lost some client commands."
-        print "===== TEST FAILED ====="
-    print get_replica_status('127.0.0.1:14000')
+        print("FAILURE: Old leader lost some client commands.")
+        print("===== TEST FAILED =====")
+    print(get_replica_status('127.0.0.1:14000'))
 
     for p in (processes):
         p.kill()

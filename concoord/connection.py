@@ -7,7 +7,6 @@
 import sys
 import socket, errno, select
 import struct
-import StringIO
 import time
 import msgpack
 import random
@@ -16,7 +15,7 @@ from concoord.pack import *
 from concoord.message import *
 from concoord.exception import ConnectionError
 
-class ConnectionPool():
+class ConnectionPool:
     """ConnectionPool keeps the connections that a certain Node knows of.
     The connections can be indexed by a Peer instance or a socket."""
     def __init__(self):
@@ -49,7 +48,7 @@ class ConnectionPool():
         """ Deletes a Connection from the ConnectionPool by its Peer"""
         peerstr = str(peer)
         with self.pool_lock:
-            if self.poolbypeer.has_key(peerstr):
+            if peerstr in self.poolbypeer:
                 conn = self.poolbypeer[peerstr]
                 del self.poolbypeer[peerstr]
                 del self.poolbysocket[conn.thesocket.fileno()]
@@ -59,14 +58,14 @@ class ConnectionPool():
                     self.nascentsockets.remove(conn.thesocket)
                 conn.close()
             else:
-                print "Trying to delete a non-existent connection from the connection pool."
+                print("Trying to delete a non-existent connection from the connection pool.")
 
     def del_connection_by_socket(self, thesocket):
         """ Deletes a Connection from the ConnectionPool by its Peer"""
         with self.pool_lock:
-            if self.poolbysocket.has_key(thesocket.fileno()):
+            if thesocket.fileno() in self.poolbysocket:
                 connindict = self.poolbysocket[thesocket.fileno()]
-                for connkey,conn in self.poolbypeer.iteritems():
+                for connkey,conn in list(self.poolbypeer.items()):
                     if conn == connindict:
                         del self.poolbypeer[connkey]
                         break
@@ -77,33 +76,33 @@ class ConnectionPool():
                     self.nascentsockets.remove(thesocket)
                 connindict.close()
             else:
-                print "Trying to delete a non-existent socket from the connection pool."
+                print("Trying to delete a non-existent socket from the connection pool.")
 
     def get_connection_by_peer(self, peer):
         """Returns a Connection given corresponding Peer triple"""
         peerstr = str(peer)
         with self.pool_lock:
-            if self.poolbypeer.has_key(peerstr):
+            if peerstr in self.poolbypeer:
                 return self.poolbypeer[peerstr]
-            else:
-                try:
-                    thesocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    thesocket.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
-                    thesocket.connect((peer[0], peer[1]))
-                    thesocket.setblocking(0)
-                    conn = Connection(thesocket, peerstr)
-                    self.poolbypeer[peerstr] = conn
-                    self.poolbysocket[thesocket.fileno()] = conn
-                    if self.epoll:
-                        self.epoll.register(thesocket.fileno(), select.EPOLLIN)
-                        self.epollsockets[thesocket.fileno()] = thesocket
-                    else:
-                        self.activesockets.add(thesocket)
-                        if thesocket in self.nascentsockets:
-                            self.nascentsockets.remove(thesocket)
-                    return conn
-                except Exception as e:
-                    return None
+
+            try:
+                thesocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                thesocket.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
+                thesocket.connect((peer[0], peer[1]))
+                thesocket.setblocking(0)
+                conn = Connection(thesocket, peerstr)
+                self.poolbypeer[peerstr] = conn
+                self.poolbysocket[thesocket.fileno()] = conn
+                if self.epoll:
+                    self.epoll.register(thesocket.fileno(), select.EPOLLIN)
+                    self.epollsockets[thesocket.fileno()] = thesocket
+                else:
+                    self.activesockets.add(thesocket)
+                    if thesocket in self.nascentsockets:
+                        self.nascentsockets.remove(thesocket)
+                return conn
+            except Exception as e:
+                pass
 
     def get_connection_by_socket(self, thesocket):
         """Returns a Connection given corresponding socket.
@@ -111,24 +110,23 @@ class ConnectionPool():
         ConnectionPool if it doesn't exist.
         """
         with self.pool_lock:
-            if self.poolbysocket.has_key(thesocket.fileno()):
+            if thesocket.fileno() in self.poolbysocket:
                 return self.poolbysocket[thesocket.fileno()]
-            else:
-                conn = Connection(thesocket)
-                self.poolbysocket[thesocket.fileno()] = conn
-                self.activesockets.add(thesocket)
-                if thesocket in self.nascentsockets:
-                    self.nascentsockets.remove(thesocket)
-                return conn
+            conn = Connection(thesocket)
+            self.poolbysocket[thesocket.fileno()] = conn
+            self.activesockets.add(thesocket)
+            if thesocket in self.nascentsockets:
+                self.nascentsockets.remove(thesocket)
+            return conn
 
     def __str__(self):
         """Returns ConnectionPool information"""
-        peerstr= "\n".join(["%s: %s" % (str(peer), str(conn)) for peer,conn in self.poolbypeer.iteritems()])
-        socketstr= "\n".join(["%s: %s" % (str(socket), str(conn)) for socket,conn in self.poolbysocket.iteritems()])
+        peerstr= "\n".join(["%s: %s" % (str(peer), str(conn)) for peer,conn in self.poolbypeer.items()])
+        socketstr= "\n".join(["%s: %s" % (str(socket), str(conn)) for socket,conn in self.poolbysocket.items()])
         temp = "Connection to Peers:\n%s\nConnection to Sockets:\n%s" %(peerstr, socketstr)
         return temp
 
-class Connection():
+class Connection:
     """Connection encloses the socket and send/receive functions for a connection."""
     def __init__(self, socket, peerid=None):
         """Initialize Connection"""
@@ -159,7 +157,7 @@ class Connection():
                 lstr = self.receive_n_bytes(4)
                 msg_length = struct.unpack("I", lstr[0:4])[0]
                 msgstr = self.receive_n_bytes(msg_length)
-                msgdict = msgpack.unpackb(msgstr, use_list=False)
+                msgdict = msgpack.unpackb(msgstr, strict_map_key=False, use_list=False)
                 return parse_message(msgdict)
             except IOError as inst:
                 return None
@@ -170,7 +168,7 @@ class Connection():
         while len(msgstr) != msg_length:
             try:
                 chunk = self.thesocket.recv(min(1024, msg_length-len(msgstr)))
-            except IOError, e:
+            except IOError as e:
                 if isinstance(e.args, tuple):
                     if e[0] == errno.EAGAIN:
                         continue
@@ -197,7 +195,7 @@ class Connection():
                     msgstr = self.incoming[4:].tobytes()
                     try:
                         msgstr += self.receive_n_bytes(msg_length-(len(self.incoming)-4))
-                        msgdict = msgpack.unpackb(msgstr, use_list=False)
+                        msgdict = msgpack.unpackb(msgstr, strict_map_key=False, use_list=False)
                         self.incomingoffset = 0
                         yield parse_message(msgdict)
                     except IOError as inst:
@@ -208,11 +206,12 @@ class Connection():
 
             self.incomingoffset += datalen
             while self.incomingoffset >= 4:
-                msg_length = (ord(self.incoming[3]) << 24) | (ord(self.incoming[2]) << 16) | (ord(self.incoming[1]) << 8) | ord(self.incoming[0])
+                msg_length = (self.incoming[3] << 24) | (self.incoming[2] << 16) | (self.incoming[1] << 8) | self.incoming[0]
                 # check if there is a complete msg, if so return the msg
                 # otherwise return None
                 if self.incomingoffset >= msg_length+4:
-                    msgdict = msgpack.unpackb(self.incoming[4:msg_length+4].tobytes(), use_list=False)
+                    msgstr = self.incoming[4:msg_length+4].tobytes()
+                    msgdict = msgpack.unpackb(msgstr, strict_map_key=False, use_list=False)
                     # this operation cuts the incoming buffer
                     if self.incomingoffset > msg_length+4:
                         self.incoming[:self.incomingoffset-(msg_length+4)] = self.incoming[msg_length+4:self.incomingoffset]
@@ -231,7 +230,7 @@ class Connection():
                     try:
                         bytesent = self.thesocket.send(message)
                         message = message[bytesent:]
-                    except IOError, e:
+                    except IOError as e:
                         if isinstance(e.args, tuple):
                             if e[0] == errno.EAGAIN:
                                 self.busywait += 1
@@ -239,30 +238,30 @@ class Connection():
                             else:
                                 raise e
                 return True
-            except socket.error, e:
+            except socket.error as e:
                  if isinstance(e.args, tuple):
                      if e[0] == errno.EPIPE:
                          return False
-            except IOError, e:
-                print "Send Error: ", e
-            except AttributeError, e:
+            except IOError as e:
+                print("Send Error: ", e)
+            except AttributeError as e:
                 pass
             return False
 
     def settimeout(self, timeout):
         try:
             self.thesocket.settimeout(timeout)
-        except socket.error, e:
+        except socket.error as e:
             if isinstance(e.args, tuple):
                 if e[0] == errno.EBADF:
-                    print "Socket closed."
+                    print("Socket closed.")
 
     def close(self):
         """Close the Connection"""
         self.thesocket.close()
         self.thesocket = None
 
-class SelfConnection():
+class SelfConnection:
     """Connection of a node to itself"""
     def __init__(self, receivedmessageslist, receivedmessages_semaphore, peerid=""):
         """Initialize Connection"""

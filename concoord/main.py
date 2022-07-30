@@ -14,7 +14,7 @@ import concoord
 from concoord.enums import *
 from concoord.safetychecker import *
 from concoord.proxygenerator import *
-import ConfigParser
+import configparser
 
 HELPSTR = "concoord, version 1.1.0-release:\n\
 concoord replica [-a address -p port -o objectname -b bootstrap -l loggeraddress -w writetodisk -d debug -n domainname -r route53] - starts a replica\n\
@@ -23,7 +23,7 @@ concoord route53key [aws_secret_access_key] - adds AWS_SECRET_ACCESS_KEY to rout
 concoord object [objectfilepath classname] - concoordifies a python object"
 
 ROUTE53CONFIGFILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'route53.cfg')
-config = ConfigParser.RawConfigParser()
+config = configparser.RawConfigParser()
 
 ## ROUTE53
 
@@ -53,12 +53,12 @@ def read_config_file():
     return (awsid,awskey)
 
 def print_config_file():
-    print "AWS_ACCESS_KEY_ID= %s\nAWS_SECRET_ACCESS_KEY= %s" % read_config_file()
+    print("AWS_ACCESS_KEY_ID= %s\nAWS_SECRET_ACCESS_KEY= %s" % read_config_file())
 
 def add_id_to_config(newid):
     awsid,awskey = read_config_file()
     if awsid and awsid == newid:
-        print "AWS_ACCESS_KEY_ID is already in the CONFIG file."
+        print("AWS_ACCESS_KEY_ID is already in the CONFIG file.")
         return
     # Write to CONFIG file
     config.set('ENVIRONMENT', 'AWS_ACCESS_KEY_ID', newid)
@@ -68,7 +68,7 @@ def add_id_to_config(newid):
 def add_key_to_config(newkey):
     awsid,awskey = read_config_file()
     if awskey and awskey == newkey:
-        print "AWS_SECRET_ACCESS_KEY is already in the CONFIG file."
+        print("AWS_SECRET_ACCESS_KEY is already in the CONFIG file.")
         return
     # Write to CONFIG file
     config.set('ENVIRONMENT', 'AWS_SECRET_ACCESS_KEY', newkey)
@@ -105,7 +105,7 @@ def concoordify():
     args = parser.parse_args()
 
     if not args.objectname:
-        print parser.print_help()
+        print(parser.print_help())
         return
     import importlib
     objectloc,a,classname = args.objectname.rpartition('.')
@@ -115,7 +115,7 @@ def concoordify():
         if hasattr(module, classname):
             object = getattr(module, classname)()
     except (ValueError, ImportError, AttributeError):
-        print "Can't find module %s, check your PYTHONPATH." % objectloc
+        print("Can't find module %s, check your PYTHONPATH." % objectloc)
 
     if module.__file__.endswith('pyc'):
         filename = module.__file__[:-1]
@@ -125,25 +125,25 @@ def concoordify():
         clientcode = fd.read()
     if args.safe:
         if args.verbose:
-            print "Checking object safety"
+            print("Checking object safety")
         if not check_object(clientcode):
-            print "Object is not safe to execute."
+            print("Object is not safe to execute.")
             os._exit(1)
         elif args.verbose:
-            print "Object is safe!"
+            print("Object is safe!")
     if args.verbose:
-        print "Creating clientproxy"
+        print("Creating clientproxy")
     clientproxycode = createclientproxy(clientcode, classname, args.securitytoken, args.proxytype)
     clientproxycode = clientproxycode.replace('\n\n\n', '\n\n')
     proxyfile = open(filename[:-3]+"proxy.py", 'w')
     proxyfile.write(clientproxycode)
     proxyfile.close()
-    print "Client proxy file created with name: ", proxyfile.name
+    print("Client proxy file created with name: ", proxyfile.name)
 
 
 def main():
     if len(sys.argv) < 2:
-        print HELPSTR
+        print(HELPSTR)
         sys.exit()
 
     eventtype = sys.argv[1].upper()
@@ -151,17 +151,17 @@ def main():
     if eventtype == 'REPLICA':
         start_replica()
     elif eventtype == 'ROUTE53ID':
-        print "Adding AWS_ACCESS_KEY_ID to CONFIG:", sys.argv[1]
+        print("Adding AWS_ACCESS_KEY_ID to CONFIG:", sys.argv[1])
         add_id_to_config(sys.argv[1])
     elif eventtype == 'ROUTE53KEY':
-        print "Adding AWS_SECRET_ACCESS_KEY to CONFIG:", sys.argv[1]
+        print("Adding AWS_SECRET_ACCESS_KEY to CONFIG:", sys.argv[1])
         add_key_to_config(sys.argv[1])
     elif eventtype == 'INITIALIZE':
         initialize()
     elif eventtype == 'OBJECT':
         concoordify()
     else:
-        print HELPSTR
+        print(HELPSTR)
 
 if __name__=='__main__':
     main()

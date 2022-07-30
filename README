@@ -29,9 +29,9 @@ Requirements
 
 The minimum requirements for ConCoord are::
 
-  - python 2.7.2 or later
-  - dnspython-1.9.4
-  - msgpack-python
+  - python 3.7 or later
+  - dnspython
+  - msgpack
 
 Installation
 ============
@@ -79,8 +79,8 @@ respectively. The replicas can also be run in the debug mode or with a logger
 with the commands shown below::
 
   Usage: concoord replica [-h] [-a ADDR] [-p PORT] [-b BOOTSTRAP]
- 	   	          [-o OBJECTNAME] [-l LOGGER] [-n DOMAIN]
-			  [-r] [-w] [-d]
+                          [-o OBJECTNAME] [-l LOGGER] [-n DOMAIN]
+                          [-r] [-w] [-d]
 
 where,
   -h, --help            show this help message and exit
@@ -94,7 +94,6 @@ where,
                         logger address
   -n DOMAIN, --domainname DOMAIN
                         domain name that the name server will accept queries for
-  -r, --route53         use Route53
   -w, --writetodisk     writing to disk on/off
   -d, --debug           debug on/off
 
@@ -103,19 +102,10 @@ Starting Replicas as Name Servers
 
 You can dynamically locate nodes in a given ConCoord instance using
 DNS queries if the instance includes replicas that can act as name
-servers. There are two ways you can run a ConCoord Replica as a name
-server.
-
-* **Master Name Server:** Keeps track of the view and responds to DNS
-  queries itself. Requires su privileges to bind to Port 53.
-
-* **Route53 Name Server:** Keeps track of the view and updates an Amazon
-  Route53 account. Amazon Route53 answers to DNS queries on behalf of
-  the slave name server. Requires a ready-to-use Amazon Route53
-  account.
+servers.
 
 Master Name Server
-+++++++++++++++++++
+++++++++++++++++++
 
 To use a replica node as a master name server first you have to setup
 the name server delegations (you can do this by updating the domain
@@ -149,49 +139,6 @@ can query the name server bound to 127.0.0.1 specifically as follows::
 
 Note that this would only work for a, srv and txt queries, since ns
 queries require absolute dns names or origins, not an ip address.
-
-Amazon Route53 Name Server
-++++++++++++++++++++++++++
-
-First make sure that boto is installed on the machine you want to run
-the Route53 name server. You can easily install boto as follows::
-
-  $ pip install boto
-
-Before starting a name server connected to Amazon Route 53, you should
-have a Route53 account set up and ready to receive requests. This is
-done through the AWS Console (http://console.aws.amazon.com/route53), by
-creating a new Hosted Zone to host your domain name.
-
-After your Route53 account is set up, the name server can update
-Route53 records every time the view of the system changes.
-
-To use the Name Server to update Amazon Route53, you should provide
-your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. You can retrieve
-these from the AWS Console (http://console.aws.amazon.com/iam), by
-looking under the security credentials of the username that you used
-while creating the Hosted Zone for your domain name. Once you have the
-information, you can set up ConCoord configuration easily as follows::
-
-  $ concoord route53id [AWS_ACCESS_KEY_ID]
-  $ concoord route53key [AWS_SECRET_ACCESS_KEY]
-
-Once you make sure that your Route53 account is set up and the
-configuration file includes your AWS credentials, you can start the
-replica with a name server as follows::
-
-  $ concoord replica -o concoord.object.counter.Counter -n counterdomain.com -r
-
-When the replica starts running, you can send queries for
-counterdomain.com and see the most current set of nodes as follows::
-
-  $ dig -t a counterdomain.com                   # returns set of Replicas
-
-  $ dig -t srv _concoord._tcp.counterdomain.com  # returns set of Replicas with ports
-
-  $ dig -t txt counterdomain.com                 # returns set of all nodes
-
-  $ dig -t ns counterdomain.com                  # returns set of name servers
 
 Connecting to ConCoord Objects
 ------------------------------
@@ -344,8 +291,8 @@ The nodes can also be run in the debug mode or with a logger with the
 commands shown below::
 
    Usage: openreplica replica [-h] [-a ADDR] [-p PORT] [-b BOOTSTRAP]
-	                      [-o OBJECTNAME] [-l LOGGER] [-n DOMAIN]
-			      [-r] [-w] [-d]
+                              [-o OBJECTNAME] [-l LOGGER] [-n DOMAIN]
+                              [-r] [-w] [-d]
 
 where,
   -h, --help            show this help message and exit
@@ -359,7 +306,6 @@ where,
                         logger address
   -n DOMAIN, --domainname DOMAIN
                         domain name that the name server will accept queries for
-  -r, --route53         use Route53
   -w, --writetodisk     writing to disk on/off
   -d, --debug           debug on/off
 
@@ -368,16 +314,7 @@ Starting Replicas as Name Servers
 
 You can dynamically locate nodes in a given ConCoord instance using
 DNS queries if the instance includes replicas that can act as name
-servers. There are two ways you can run a ConCoord Replica as a name
-server.
-
-* **Master Name Server:** Keeps track of the view and responds to DNS
-  queries itself. Requires su privileges to bind to port 53.
-
-* **Route53 Name Server:** Keeps track of the view and updates an Amazon
-  Route53 account. Amazon Route53 answers to DNS queries on behalf of
-  the slave name server. Requires a ready-to-use Amazon Route53
-  account.
+servers.
 
 Master Name Server
 ++++++++++++++++++
@@ -399,50 +336,6 @@ provide the bootstrap::
 When the replica starts running, you can send queries for
 counterdomain.com and see the most current set of nodes as
 follows::
-
-  $ dig -t a counterdomain.com                   # returns set of Replicas
-
-  $ dig -t srv _concoord._tcp.counterdomain.com  # returns set of Replicas with ports
-
-  $ dig -t txt counterdomain.com                 # returns set of all nodes
-
-  $ dig -t ns counterdomain.com                  # returns set of name servers
-
-Amazon Route53 Name Server
-++++++++++++++++++++++++++
-
-First make sure that boto is installed on the machine you want to run
-the Route53 name server. OpenReplica tries to do this automatically
-when a replica is run as a Route53 name server, but if it fails to do
-so, you can easily install boto on the machine you want as follows::
-
-  $ pip install boto
-
-Before starting a name server connected to Amazon Route53, you should
-have a Route53 account set up and ready to receive requests. This is
-done through the AWS Console (http://console.aws.amazon.com/route53), by
-creating a new Hosted Zone to host your domain name.
-
-After your Route53 account is set up, the name server can update
-Route53 records every time the view of the system changes.
-
-To use the Name Server to update Amazon Route53, you should provide
-your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. You can retrieve
-these from the AWS Console (http://console.aws.amazon.com/iam/), by
-looking under the security credentials of the username that you used
-while creating the Hosted Zone for your domain name. Once you have the
-information, you can set up Route53 configuration easily as follows::
-
-  $ openreplica route53 [public_dns AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY]
-
-Once you make sure that your Route53 account is set up and the
-configuration file includes your AWS credentials, you can start the
-replica with a name server as follows::
-
-  $ openreplica replica -o concoord.object.counter.Counter -n counterdomain.com -r
-
-When the replica starts running, you can send queries for
-counterdomain.com and see the most current set of nodes as follows::
 
   $ dig -t a counterdomain.com                   # returns set of Replicas
 
@@ -499,13 +392,13 @@ command::
                          [-s] [-v]
 
 where,
-  -h, --help					show this help message and exit
-  -o OBJECTNAME, --objectname OBJECTNAME	client object dotted name module.Class
-  -t SECURITYTOKEN, --token SECURITYTOKEN	security token
-  -p PROXYTYPE, --proxytype PROXYTYPE		0:BASIC, 1:BLOCKING,
-     			    			2:CLIENT-SIDE BATCHING, 3:SERVER-SIDE BATCHING
-  -s, --safe            			safety checking on/off
-  -v, --verbose         			verbose mode on/off
+  -h, --help                                    show this help message and exit
+  -o OBJECTNAME, --objectname OBJECTNAME        client object dotted name module.Class
+  -t SECURITYTOKEN, --token SECURITYTOKEN       security token
+  -p PROXYTYPE, --proxytype PROXYTYPE           0:BASIC, 1:BLOCKING,
+                                                2:CLIENT-SIDE BATCHING, 3:SERVER-SIDE BATCHING
+  -s, --safe                                    safety checking on/off
+  -v, --verbose                                 verbose mode on/off
 
 This script will create a proxy file under the directory that the
 object resides (i.e. /foo/)::
@@ -599,7 +492,7 @@ ConCoord instance will remain in a safe state::
 
     def acquire(self, _concoord_command):
       try:
-	return self.semaphore.acquire(_concoord_command)
+        return self.semaphore.acquire(_concoord_command)
       except Exception as e:
         raise e
 

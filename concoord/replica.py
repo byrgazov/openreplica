@@ -7,7 +7,7 @@ import inspect
 import time
 import os, sys
 import signal
-import cPickle as pickle
+import pickle
 from threading import Thread, Lock, Timer, Event
 from concoord.pack import Proposal, PValue
 from concoord.pvalue import PValueSet
@@ -94,7 +94,7 @@ class Replica(Node):
         rstr += "Members:\n%s\n" % "\n".join(str(peer) for peer in self.replicas)
         rstr += "Waiting to execute command %d.\n" % self.nexttoexecute
         rstr += "Commands:\n"
-        for commandnumber, command in self.decisions.iteritems():
+        for commandnumber, command in self.decisions.items():
             state = ''
             if command in self.executed:
                 if isinstance(command, ProposalClientBatch):
@@ -104,11 +104,11 @@ class Replica(Node):
             rstr += str(commandnumber) + ":\t" + str(command) + state + '\n'
         if len(self.pendingcommands):
             rstr += "Pending Commands:\n"
-            for commandnumber, command in self.pendingcommands.iteritems():
+            for commandnumber, command in self.pendingcommands.items():
                 rstr += str(commandnumber) + ":\t" + str(command) + '\n'
         if len(self.proposals):
             rstr += "Proposals:\n"
-            for commandnumber, command in self.proposals.iteritems():
+            for commandnumber, command in self.proposals.items():
                 rstr += str(commandnumber) + ":\t" + str(command) + '\n'
         # Add QUORUM State
         rstr += "Quorum Ballot Number: %s\n" % str(self.quorumballotnumber)
@@ -127,7 +127,7 @@ class Replica(Node):
         """Start the background services associated with a replica."""
         Node.startservice(self)
 
-        if self.isnameserver and not self.useroute53:
+        if self.isnameserver:
             if self.debug: self.logger.write("State", "Starting the Nameserver Thread.")
             # Start a thread for the UDP server
             UDP_server_thread = Thread(target=self.nameserver.udp_server_loop, name='UDPServerThread')
@@ -173,7 +173,7 @@ class Replica(Node):
                     clientreplycode = CR_OK
                     # If there are clients to be unblocked that have
                     # been blocked previously, send them unblock messages
-                    for unblockedclientcommand in unblocked.iterkeys():
+                    for unblockedclientcommand in unblocked.keys():
                         self.send_reply_to_client(CR_UNBLOCK, None, unblockedclientcommand)
                 except Exception as e:
                     if self.debug: self.logger.write("Execution Error", "Error during method invocation: %s" % str(e))
@@ -192,7 +192,7 @@ class Replica(Node):
             clientreplies.append((clientreplycode, givenresult, unblocked))
         self.add_to_executed(commandbatch, clientreplies)
 
-        if self.isleader and str(commandbatch.client) in self.connectionpool.poolbypeer.keys():
+        if self.isleader and str(commandbatch.client) in self.connectionpool.poolbypeer:
             self.send_replybatch_to_client(clientreplies, commandbatch)
 
         if self.nexttoexecute % GARBAGEPERIOD == 0 and self.isleader:
@@ -274,7 +274,7 @@ class Replica(Node):
                     send_result_to_client = True
                     # If there are clients to be unblocked that have
                     # been blocked previously, send them unblock messages
-                    for unblockedclientcommand in unblocked.iterkeys():
+                    for unblockedclientcommand in unblocked.keys():
                         self.send_reply_to_client(CR_UNBLOCK, None, unblockedclientcommand)
                 except Exception as e:
                     if self.debug: self.logger.write("Execution Error",
@@ -302,7 +302,7 @@ class Replica(Node):
         if commandname not in METACOMMANDS:
             # if this client contacted me for this operation, return him the response
             if send_result_to_client and self.isleader and \
-                    str(command.client) in self.connectionpool.poolbypeer.keys():
+                    str(command.client) in self.connectionpool.poolbypeer:
                 self.send_reply_to_client(clientreplycode, givenresult, command)
 
         if self.nexttoexecute % GARBAGEPERIOD == 0 and self.isleader:
@@ -381,7 +381,7 @@ class Replica(Node):
                 prevrcode, prevresult, prevunblocked = self.executed[requestedcommand]
                 if prevrcode == CR_BLOCK:
                     # As dictionary is not sorted we have to start from the beginning every time
-                    for resultset in self.executed.itervalues():
+                    for resultset in self.executed.values():
                         if resultset[EXC_UNBLOCKED] == requestedcommand:
                             # This client has been UNBLOCKED
                             prevresult = None
@@ -416,18 +416,6 @@ class Replica(Node):
     def pick_commandnumber_add_to_pending(self, givenproposal):
         givencommandnumber = self.find_commandnumber()
         self.add_to_pendingcommands(givencommandnumber, givenproposal)
-
-    def issue_next_command(self):
-        if self.debug: self.logger.write("State", "Pending commands: %s" % str(self.pendingcommands))
-        if self.debug: self.logger.write("State", "Pending commandset: %s" % str(self.pendingcommandset))
-        if len(self.pendingcommands) == 0:
-            return
-        smallestcommandnumber = sorted(self.pendingcommands.keys())[0]
-        if smallestcommandnumber in self.pendingcommands:
-            if self.active:
-                self.do_command_propose_from_pending(smallestcommandnumber)
-            else:
-                self.do_command_prepare_from_pending(smallestcommandnumber)
 
     def issue_pending_commands(self):
         if self.debug: self.logger.write("State", "Pending commands: %s" % str(self.pendingcommands))
@@ -511,7 +499,7 @@ class Replica(Node):
         # If the node is already up-to-date, return.
         if self.stateuptodate:
             return
-        for key,value in self.decisions.iteritems():
+        for key,value in self.decisions.items():
             if key in msg.decisions:
                 assert self.decisions[key] == msg.decisions[key], "Update Error"
         # update decisions cumulatively
@@ -1300,14 +1288,14 @@ class Replica(Node):
                 del self.outstandingprepares[msg.inresponseto]
                 # choose pvalues with distinctive commandnumbers and highest ballotnumbers
                 pmaxset = prc.possiblepvalueset.pmax()
-                for commandnumber,proposal in pmaxset.iteritems():
+                for commandnumber,proposal in pmaxset.items():
                     self.add_to_proposals(commandnumber, proposal)
                 # If the commandnumber we were planning to use is overwritten
                 # we should try proposing with a new commandnumber
                 if self.proposals[prc.commandnumber] != prc.proposal:
                     self.pick_commandnumber_add_to_pending(prc.proposal)
                     self.issue_pending_commands()
-                for chosencommandnumber,chosenproposal in self.proposals.iteritems():
+                for chosencommandnumber,chosenproposal in self.proposals.items():
                     # send proposals for every outstanding proposal that is collected
                     if self.debug: self.logger.write("Paxos State", "Sending PROPOSE for %d, %s"
                                                      % (chosencommandnumber, chosenproposal))
@@ -1568,7 +1556,7 @@ class Replica(Node):
             cmdproposal = Proposal(self.me, random.randint(1,10000000), args[1:])
             self.handle_client_command(cmdproposal)
         except IndexError as e:
-            print "command expects only one command: ", str(e)
+            print("command expects only one command:", str(e))
 
     def cmd_goleader(self, args):
         """start Leader state"""
@@ -1576,21 +1564,21 @@ class Replica(Node):
 
     def cmd_showobject(self, args):
         """print replicated object information"""
-        print self.object
+        print(self.object)
 
     def cmd_info(self, args):
         """print next commandnumber to execute and executed commands"""
-        print str(self)
+        print(self)
 
     def cmd_proposals(self,args):
         """prints proposals"""
-        for cmdnum,command in self.proposals.iteritems():
-            print "%d: %s" % (cmdnum,str(command))
+        for cmdnum,command in self.proposals.items():
+            print("%d: %s" % (cmdnum, command))
 
     def cmd_pending(self,args):
         """prints pending commands"""
-        for cmdnum,command in self.pendingcommands.iteritems():
-            print "%d: %s" % (cmdnum,str(command))
+        for cmdnum,command in self.pendingcommands.items():
+            print("%d: %s" % (cmdnum, command))
 
 ## TERMINATION METHODS
     def terminate_handler(self, signal, frame):

@@ -3,7 +3,7 @@
 @note: Proxy Generator that creates ConCoord proxy files from regular Python objects.
 @copyright: See LICENSE
 '''
-import codegen
+from . import codegen
 import ast, _ast
 import os, shutil
 import inspect, types, string

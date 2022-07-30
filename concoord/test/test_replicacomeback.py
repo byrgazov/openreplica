@@ -33,14 +33,14 @@ def test_failure(numreplicas):
     replicas = []
     replicanames = []
 
-    print "Running replica 0"
+    print("Running replica 0")
     replicas.append(subprocess.Popen(['concoord', 'replica',
                                       '-o', 'concoord.object.counter.Counter',
                                       '-a', '127.0.0.1', '-p', '14000']))
     replicanames.append("127.0.0.1:14000")
 
     for i in range(1, numreplicas):
-        print "Running replica %d" %i
+        print("Running replica %d" %i)
         replicas.append(subprocess.Popen(['concoord', 'replica',
                                       '-o', 'concoord.object.counter.Counter',
                                       '-a', '127.0.0.1', '-p', '1400%d'%i,
@@ -55,23 +55,23 @@ def test_failure(numreplicas):
     c = Counter(replicastring)
     for i in range(50):
         c.increment()
-    print "Counter value after 50 increments: %d" % c.getvalue()
+    print("Counter value after 50 increments: %d" % c.getvalue())
 
     # Start kiling replicas
-    print "Killing replicas one by one."
+    print("Killing replicas one by one.")
     for i in range((numreplicas-1)/2):
-        print "Killing replica %d" %i
+        print("Killing replica %d" %i)
         replicas[i].kill()
 
         # Clientproxy operations should still work
         c = Counter('127.0.0.1:1400%d'%(i+1))
         for i in range(50):
             c.increment()
-        print "Counter value after 50 more increments: %d" % c.getvalue()
+        print("Counter value after 50 more increments: %d" % c.getvalue())
 
     # Start bringing replicas back
     for i in reversed(xrange((numreplicas-1)/2)):
-        print "Running replica %d" %i
+        print("Running replica %d" %i)
         replicas.append(subprocess.Popen(['concoord', 'replica',
                                       '-o', 'concoord.object.counter.Counter',
                                       '-a', '127.0.0.1', '-p', '1400%d'%i,
@@ -88,22 +88,22 @@ def test_failure(numreplicas):
 
         for i in range(50):
             c.increment()
-        print "Counter value after 50 more increments: %d" % c.getvalue()
+        print("Counter value after 50 more increments: %d" % c.getvalue())
 
     for p in (replicas):
         p.kill()
     return True
 
 def main():
-    print "===== TEST 3 REPLICAS ====="
+    print("===== TEST 3 REPLICAS =====")
     s = "PASSED" if test_failure(3) else "TIMED OUT"
-    print "===== TEST %s =====" % s
-    print "===== TEST 5 REPLICAS ====="
+    print("===== TEST %s =====" % s)
+    print("===== TEST 5 REPLICAS =====")
     s = "PASSED" if test_failure(5) else "TIMED OUT"
-    print "===== TEST %s =====" % s
-    print "===== TEST 7 REPLICAS ====="
+    print("===== TEST %s =====" % s)
+    print("===== TEST 7 REPLICAS =====")
     s = "PASSED" if test_failure(7) else "TIMED OUT"
-    print "===== TEST %s =====" % s
+    print("===== TEST %s =====" % s)
 
 if __name__ == '__main__':
     main()

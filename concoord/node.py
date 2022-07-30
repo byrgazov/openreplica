@@ -6,9 +6,9 @@
 import argparse
 import os, sys
 import random, struct
-import cPickle as pickle
+import pickle
 import time, socket, select
-from Queue import Queue
+from queue import Queue
 from threading import Thread, RLock, Lock, Condition, Timer, Semaphore
 from concoord.enums import *
 from concoord.nameserver import Nameserver
@@ -21,7 +21,7 @@ from concoord.connection import ConnectionPool, Connection, SelfConnection
 
 try:
     import dns.resolver, dns.exception
-except:
+except ImportError:
     print("Install dnspython: http://www.dnspython.org/")
 
 parser = argparse.ArgumentParser()
@@ -38,8 +38,6 @@ parser.add_argument("-l", "--logger", action="store", dest="logger", default='',
                     help="logger address")
 parser.add_argument("-n", "--domainname", action="store", dest="domain", default='',
                     help="domain name that the nameserver will accept queries for")
-parser.add_argument("-r", "--route53", action="store_true", dest="route53", default=False,
-                    help="use Route53 (requires a Route53 zone)")
 parser.add_argument("-w", "--writetodisk", action="store_true", dest="writetodisk", default=False,
                     help="writing to disk on/off")
 parser.add_argument("-d", "--debug", action="store_true", dest="debug", default=False,
@@ -64,7 +62,6 @@ class Node():
         self.durable = writetodisk
         self.isnameserver = args.domain != ''
         self.domain = args.domain
-        self.useroute53 = args.route53
         if objectname == '':
             parser.print_help()
             self._graceexit(1)
@@ -84,8 +81,8 @@ class Node():
             try:
                 self.socket.bind((self.addr,self.port))
             except socket.error as e:
-                print "Cannot bind to port %d" % self.port
-                print "Socket Error: ", e
+                print("Cannot bind to port %d" % self.port)
+                print("Socket Error: ", e)
                 self._graceexit(1)
         else:
             for i in range(50):
@@ -94,7 +91,7 @@ class Node():
                     self.socket.bind((self.addr,self.port))
                     break
                 except socket.error as e:
-                    print "Socket Error: ", e
+                    print("Socket Error: ", e)
         self.socket.listen(10)
         self.connectionpool = ConnectionPool()
 
@@ -117,11 +114,10 @@ class Node():
         if self.isnameserver:
             self.type = NODE_NAMESERVER
             try:
-                self.nameserver = Nameserver(self.addr, self.domain, self.useroute53,
-                                             self.replicas, self.debug)
+                self.nameserver = Nameserver(self.addr, self.domain, self.replicas, self.debug)
             except Exception as e:
-                print "Error:", e
-                print "Could not start Replica as a Nameserver, exiting."
+                print("Error:", e)
+                print("Could not start Replica as a Nameserver, exiting.")
                 self._graceexit(1)
         else:
             self.type = NODE_REPLICA
@@ -137,7 +133,7 @@ class Node():
         self.logger = Logger("%s-%s" % (node_names[self.type],self.id), lognode=LOGGERNODE)
         if self.isnameserver:
             self.nameserver.add_logger(self.logger)
-        print "%s-%s connected." % (node_names[self.type],self.id)
+        print("%s-%s connected." % (node_names[self.type],self.id))
 
         # Keeps the liveness of the nodes
         self.nodeliveness = {}
@@ -224,7 +220,7 @@ class Node():
             returnstr += node_names[peer.type] + " %s:%d\n" % (peer.addr,peer.port)
         if hasattr(self, 'pendingcommands') and len(self.pendingcommands) > 0:
             pending =  "".join("%d: %s" % (cno, proposal) for cno,proposal \
-                                   in self.pendingcommands.iteritems())
+                                   in self.pendingcommands.items())
             returnstr = "%s\nPending:\n%s" % (returnstr, pending)
         return returnstr
 
@@ -285,7 +281,6 @@ class Node():
             self.use_select()
 
         self.socket.close()
-        return
 
     def use_epoll(self):
         while self.alive:
@@ -308,7 +303,7 @@ class Node():
                         self.connectionpool.epoll.unregister(fileno)
                         self.connectionpool.epollsockets[fileno].close()
                         del self.connectionpool.epollsockets[fileno]
-            except KeyboardInterrupt, EOFError:
+            except (KeyboardInterrupt, EOFError):
                 os._exit(0)
         self.connectionpool.epoll.unregister(self.socket.fileno())
         self.connectionpool.epoll.close()
@@ -322,7 +317,7 @@ class Node():
                                                                    1)
 
                 for s in exceptready:
-                    if self.debug: self.logger.write("Exception", "%s" % s)
+                    if self.debug: self.logger.write("Exception", str(s))
                 for s in inputready:
                     if s == self.socket:
                         clientsock,clientaddr = self.socket.accept()
@@ -336,7 +331,7 @@ class Node():
                         success = self.handle_connection(s)
                     if not success:
                         self.connectionpool.del_connection_by_socket(s)
-            except KeyboardInterrupt, EOFError:
+            except (KeyboardInterrupt, EOFError):
                 os._exit(0)
 
     def handle_connection(self, clientsock):
@@ -393,7 +388,6 @@ class Node():
                     self.process_message(message_to_process, connection)
             else:
                 self.process_message(message_to_process, connection)
-        return
 
     def process_messagelist(self, msgconnlist):
         """Processes given message connection pairs"""
@@ -443,10 +437,10 @@ class Node():
     def cmd_help(self, args):
         """prints the commands that are supported
         by the corresponding Node."""
-        print "Commands supported:"
+        print("Commands supported:")
         for attr in dir(self):
             if attr.startswith("cmd_"):
-                print attr.replace("cmd_", "")
+                print(attr.replace("cmd_", ""))
 
     def cmd_exit(self, args):
         """Changes the liveness state and dies"""
@@ -455,26 +449,26 @@ class Node():
 
     def cmd_state(self, args):
         """prints connectivity state of the corresponding Node."""
-        print "\n%s\n" % (self.statestr())
+        print("\n%s\n" % (self.statestr()))
 
     def get_user_input_from_shell(self):
         """Shell loop that accepts inputs from the command prompt and
         calls corresponding command handlers."""
         while self.alive:
             try:
-                input = raw_input(">")
-                if len(input) == 0:
+                value = input("> ")
+                if len(value) == 0:
                     continue
                 else:
-                    input = input.split()
-                    mname = "cmd_%s" % input[0].lower()
+                    value = value.split()
+                    mname = "cmd_%s" % value[0].lower()
                     try:
                         method = getattr(self, mname)
                     except AttributeError as e:
-                        print "Command not supported: ", str(e)
+                        print("Command not supported: ", str(e))
                         continue
                     with self.lock:
-                        method(input)
+                        method(value)
             except KeyboardInterrupt:
                 os._exit(0)
             except EOFError:
@@ -492,7 +486,7 @@ class Node():
             return message[FLD_ID]
         elif group:
             ids = []
-            for peer,liveness in group.iteritems():
+            for peer,liveness in group.items():
                 connection = self.connectionpool.get_connection_by_peer(peer)
                 if connection == None:
                     if self.debug: self.logger.write("Connection Error",

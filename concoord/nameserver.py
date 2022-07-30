@@ -8,7 +8,7 @@ from time import strftime, gmtime
 from concoord.utils import *
 from concoord.enums import *
 from concoord.pack import *
-from concoord.route53 import *
+
 try:
     import dns.exception
     import dns.message
@@ -17,14 +17,8 @@ try:
     import dns.rdatatype
     import dns.name
     from dns.flags import *
-except:
-    print "To use the nameserver install dnspython: http://www.dnspython.org/"
-
-try:
-    from boto.route53.connection import Route53Connection
-    from boto.route53.exception import DNSServerError
-except:
-    pass
+except ImportError:
+    print("To use the nameserver install dnspython: http://www.dnspython.org/")
 
 RRTYPE = ['','A','NS','MD','MF','CNAME','SOA', 'MB', 'MG', 'MR', 'NULL',
           'WKS', 'PTR', 'HINFO', 'MINFO', 'MX', 'TXT', 'RP', 'AFSDB',
@@ -39,7 +33,7 @@ SRVNAME = '_concoord._tcp.'
 class Nameserver():
     """Nameserver keeps track of the connectivity state of the system and replies to
     QUERY messages from dnsserver."""
-    def __init__(self, addr, domain, route53, replicas, debug):
+    def __init__(self, addr, domain, replicas, debug):
         self.ipconverter = '.ipaddr.'+domain+'.'
         try:
             if domain.find('.') > 0:
@@ -48,58 +42,22 @@ class Nameserver():
                 self.mydomain = domain
             self.mysrvdomain = dns.name.Name((SRVNAME+domain+'.').split('.'))
         except dns.name.EmptyLabel as e:
-            print "A DNS name is required. Use -n option."
+            print("A DNS name is required. Use -n option.")
             raise e
 
         # Replicas of the Replica
         self.replicas = replicas
         self.debug = debug
 
-        self.route53 = route53
-        if self.route53:
-            try:
-                from boto.route53.connection import Route53Connection
-                from boto.route53.exception import DNSServerError
-            except Exception as e:
-                print "To use Amazon Route 53, install boto: http://github.com/boto/boto/"
-                raise e
-
-            # Check if AWS CONFIG data is present
-            ROUTE53CONFIGFILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'route53.cfg')
-            # Touching the CONFIG file
-            with open(ROUTE53CONFIGFILE, 'a'):
-                os.utime(ROUTE53CONFIGFILE, None)
-
-            import ConfigParser
-            config = ConfigParser.RawConfigParser()
-            config.read(ROUTE53CONFIGFILE)
-
-            try:
-                AWS_ACCESS_KEY_ID = config.get('ENVIRONMENT', 'AWS_ACCESS_KEY_ID')
-                AWS_SECRET_ACCESS_KEY = config.get('ENVIRONMENT', 'AWS_SECRET_ACCESS_KEY')
-            except Exception as e:
-                print "To use Route53 set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY as follows:"
-                print "$ concoord route53id [AWS_ACCESS_KEY_ID]"
-                print "$ concoord route53key [AWS_SECRET_ACCESS_KEY]"
-                sys.exit(1)
-
-            # initialize Route 53 connection
-            self.route53_name = domain+'.'
-            self.route53_conn = Route53Connection(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-            # get the zone_id for the domainname, the domainname
-            # should be added to the zones beforehand
-            self.route53_zone_id = self.get_zone_id(self.route53_conn, self.route53_name)
-            self.updateroute53()
-        else: # STANDALONE NAMESERVER
-            self.addr = addr if addr else findOwnIP()
-            self.udpport = 53
-            self.udpsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            try:
-                self.udpsocket.bind((self.addr,self.udpport))
-                print "Connected to " + self.addr + ":" + str(self.udpport)
-            except socket.error as e:
-                print "Can't bind to UDP port 53: %s" % str(e)
-                raise e
+        self.addr = addr if addr else findOwnIP()
+        self.udpport = 53
+        self.udpsocket = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        try:
+            self.udpsocket.bind((self.addr,self.udpport))
+            print("Connected to " + self.addr + ":" + str(self.udpport))
+        except socket.error as e:
+            print("Can't bind to UDP port 53: %s" % str(e))
+            raise e
 
         # When the nameserver starts the revision number is 00 for that day
         self.revision = strftime("%Y%m%d", gmtime())+str(0).zfill(2)
@@ -117,10 +75,10 @@ class Nameserver():
                     data,clientaddr = self.udpsocket.recvfrom(UDPMAXLEN)
                     if self.debug: self.logger.write("DNS State", "received a message from address %s" % str(clientaddr))
                     self.handle_query(data,clientaddr)
-            except KeyboardInterrupt, EOFError:
+            except (KeyboardInterrupt, EOFError):
                 os._exit(0)
             except Exception as e:
-                print "Error:", type(e), e.message
+                print("Error:", type(e), e.message)
                 continue
         self.udpsocket.close()
         return
@@ -256,106 +214,6 @@ class Nameserver():
         return additionalstr
 
     def update(self):
-        self.updaterevision()
-        if self.route53:
-            self.updateroute53()
-
-    ########## ROUTE 53 ##########
-
-    def get_zone_id(self, conn, name):
-        response = conn.get_all_hosted_zones()
-        for zoneinfo in response['ListHostedZonesResponse']['HostedZones']:
-            if zoneinfo['Name'] == name:
-                return zoneinfo['Id'].split("/")[-1]
-
-    def append_record(self, conn, hosted_zone_id, name, type, newvalues, ttl=600,
-                      identifier=None, weight=None, comment=""):
-        values = get_values(conn, hosted_zone_id, name, type)
-        if values == '':
-            values = newvalues
-        else:
-            values += ',' + newvalues
-        change_record(conn, hosted_zone_id, name, type, values, ttl=ttl, identifier=identifier, weight=weight, comment=comment)
-
-    def get_values(self, conn, hosted_zone_id, name, type):
-        response = conn.get_all_rrsets(hosted_zone_id, 'A', name)
-        for record in response:
-            if record.type == type:
-                values = ','.join(record.resource_records)
-        return values
-
-    def add_record_bool(self, conn, zone_id, name, type, values, ttl=600, identifier=None, weight=None, comment=""):
-        # Add Record succeeds only when the type doesn't exist yet
-        try:
-            add_record(conn, zone_id, name, type, values, ttl=ttl, identifier=identifier, weight=weight, comment=comment)
-        except DNSServerError as e:
-            return False
-        return True
-
-    def change_record_bool(self, conn, zone_id, name, type, values, ttl=600, identifier=None, weight=None, comment=""):
-        try:
-            change_record(conn, zone_id, name, type, values, ttl=ttl, identifier=identifier, weight=weight, comment=comment)
-        except DNSServerError as e:
-            print e
-            return False
-        return True
-
-    def append_record_bool(self, conn, zone_id, name, type, values, ttl=600, identifier=None, weight=None, comment=""):
-        try:
-            append_record(conn, zone_id, name, type, values, ttl=ttl, identifier=identifier, weight=weight, comment=comment)
-        except DNSServerError as e:
-            print e
-            return False
-        return True
-
-    def del_record_bool(self, conn, zone_id, name, type, values, ttl=600, identifier=None, weight=None, comment=""):
-        try:
-            del_record(conn, zone_id, name, type, values, ttl=ttl, identifier=identifier, weight=weight, comment=comment)
-        except DNSServerError as e:
-            print e
-
-    def route53_a(self):
-        values = []
-        for address in get_addresses(self.replicas):
-            values.append(address)
-        return ','.join(values)
-
-    def route53_srv(self):
-        values = []
-        priority = 0
-        weight = 100
-        for address,port in get_addressportpairs(self.replicas):
-            values.append('%d %d %d %s' % (priority, weight, port, address+self.ipconverter))
-        return ','.join(values)
-
-    def route53_txt(self):
-        txtstr = self.txtresponse()
-        lentxtstr = len(txtstr)
-        strings = ["\""+txtstr[0:253]+"\""]
-        if lentxtstr > 253:
-            # cut the string in chunks
-            for i in range(lentxtstr/253):
-                strings.append("\""+txtstr[i*253:(i+1)*253]+"\"")
-        return strings
-
-    def updateroute53(self):
-        # type A: update only if added node is a Replica
-        rtype = 'A'
-        newvalue = self.route53_a()
-        self.change_record_bool(self.route53_conn, self.route53_zone_id,
-                           self.route53_name, 'A', newvalue)
-        # type SRV: update only if added node is a Replica
-        rtype = 'SRV'
-        newvalue = self.route53_srv()
-        self.change_record_bool(self.route53_conn, self.route53_zone_id,
-                           self.route53_name, 'SRV', newvalue)
-        # type TXT: All Nodes
-        rtype = 'TXT'
-        newvalue = ','.join(self.route53_txt())
-        self.change_record_bool(self.route53_conn, self.route53_zone_id,
-                           self.route53_name, 'TXT', newvalue)
-
-    def updaterevision(self):
         if self.debug: self.logger.write("State", "Updating Revision -- from: %s" % self.revision)
         if strftime("%Y%m%d", gmtime()) in self.revision:
             rno = int(self.revision[-2]+self.revision[-1])

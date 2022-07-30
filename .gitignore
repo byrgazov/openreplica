@@ -1,5 +1,7 @@
+bin/
 build/
 dist/
+lib/
 MANIFEST
 secret
 planetlab_packages
@@ -15,3 +17,7 @@ concoord_log_*
 nohup.out
 *.egg-info
 concoordlog
+.python-version
+pyvenv.cfg
+*.geany
+*.sock
